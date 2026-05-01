@@ -1,0 +1,126 @@
+/index.html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>石割りゲーム</title>
+
+<style>
+body {
+  text-align: center;
+  font-family: sans-serif;
+  background: #222;
+  color: white;
+}
+
+/* 石の形（いびつにする） */
+#stone {
+  width: 220px;
+  height: 200px;
+  margin: 40px auto;
+  background: linear-gradient(145deg, #777, #444);
+  clip-path: polygon(
+    20% 0%, 80% 5%, 100% 40%, 85% 90%,
+    30% 100%, 5% 70%, 0% 30%
+  );
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.08s;
+}
+
+/* 押したとき */
+#stone:active {
+  transform: scale(0.92);
+}
+
+/* ヒビ */
+.crack {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  pointer-events: none;
+}
+
+/* 複数ヒビ */
+.crack1 { background-image: url('https://i.imgur.com/8QfQZ6M.png'); opacity: 0; }
+.crack2 { background-image: url('https://i.imgur.com/6X4Z6bP.png'); opacity: 0; }
+.crack3 { background-image: url('https://i.imgur.com/Uq6Y4lM.png'); opacity: 0; }
+
+button {
+  padding: 10px 20px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>⛏ 石割りゲーム</h1>
+
+<div id="stone">
+  <div class="crack crack1"></div>
+  <div class="crack crack2"></div>
+  <div class="crack crack3"></div>
+</div>
+
+<p>HP: <span id="hp"></span></p>
+<p>ダメージ: <span id="power"></span></p>
+<p>スコア: <span id="score">0</span></p>
+
+<button onclick="upgrade()">強化 (10)</button>
+
+<script>
+let maxHp = 20;
+let hp = maxHp;
+let power = 1;
+let score = 0;
+
+const cracks = [
+  document.querySelector(".crack1"),
+  document.querySelector(".crack2"),
+  document.querySelector(".crack3")
+];
+
+function update() {
+  document.getElementById("hp").textContent = hp + " / " + maxHp;
+  document.getElementById("power").textContent = power;
+  document.getElementById("score").textContent = score;
+}
+
+document.getElementById("stone").onclick = function() {
+  hp -= power;
+
+  // ヒビを順番に追加（クリックごとに増える）
+  let damageLevel = Math.floor((1 - hp / maxHp) * cracks.length);
+  cracks.forEach((c, i) => {
+    c.style.opacity = i < damageLevel ? 1 : 0;
+  });
+
+  if (hp <= 0) {
+    score += 5;
+    maxHp += 10;
+    hp = maxHp;
+
+    // ヒビリセット
+    cracks.forEach(c => c.style.opacity = 0);
+
+    alert("💥 石を割った！");
+  }
+
+  update();
+};
+
+function upgrade() {
+  if (score >= 10) {
+    score -= 10;
+    power++;
+    update();
+  }
+}
+
+update();
+</script>
+
+</body>
+</html>
