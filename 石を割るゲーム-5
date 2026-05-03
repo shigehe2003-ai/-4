@@ -1,0 +1,228 @@
+/index.html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>リアル石割りシミュレーター</title>
+<style>
+  body {
+    text-align: center;
+    font-family: 'Segoe UI', sans-serif;
+    background: #121212;
+    color: #eee;
+    margin: 0;
+    overflow: hidden; /* 破片が外に出ないように */
+    user-select: none;
+  }
+
+  h1 { margin-top: 20px; color: #777; letter-spacing: 2px; }
+
+  /* 石の描画エリア */
+  #game-viewport {
+    position: relative;
+    width: 100vw;
+    height: 400px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* 石本体 */
+  #stone {
+    width: 240px;
+    height: 220px;
+    background: radial-gradient(circle at 40% 40%, #999, #333);
+    clip-path: polygon(30% 0%, 80% 10%, 100% 40%, 85% 85%, 40% 100%, 5% 80%, 0% 30%);
+    position: relative;
+    cursor: pointer;
+    box-shadow: 0 30px 50px rgba(0,0,0,0.7);
+    transition: transform 0.05s ease-out;
+    z-index: 2;
+  }
+
+  /* リアルなヒビ（SVGで動的生成） */
+  #crack-svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 3;
+  }
+
+  /* 破片のスタイル */
+  .debris {
+    position: absolute;
+    background: #555;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* ステータス周り */
+  .ui-panel {
+    background: rgba(40, 40, 40, 0.9);
+    padding: 20px;
+    border-top: 2px solid #444;
+    position: fixed;
+    bottom: 0; width: 100%;
+    display: flex; justify-content: center; gap: 30px;
+  }
+
+  .stat-group { text-align: left; }
+  .label { font-size: 12px; color: #888; text-transform: uppercase; }
+  .number { font-size: 20px; font-weight: bold; color: #ffd700; display: block; }
+
+  button {
+    background: linear-gradient(to bottom, #555, #222);
+    border: 1px solid #666;
+    color: white;
+    padding: 10px 25px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  button:hover { brightness: 1.2; }
+  button:disabled { opacity: 0.3; }
+
+</style>
+</head>
+<body>
+
+<h1>⛏ REAL ROCK BREAKER</h1>
+
+<div id="game-viewport">
+  <div id="stone">
+    <svg id="crack-svg"></svg>
+  </div>
+</div>
+
+<div class="ui-panel">
+  <div class="stat-group"><span class="label">Target HP</span><span id="hp" class="number">-</span></div>
+  <div class="stat-group"><span class="label">Power</span><span id="power" class="number">-</span></div>
+  <div class="stat-group"><span class="label">Score</span><span id="score" class="number">-</span></div>
+  <button id="upgradeBtn" onclick="upgrade()">UPGRADE (Cost: 10)</button>
+</div>
+
+<script>
+let maxHp = 30;
+let hp = maxHp;
+let power = 1;
+let score = 0;
+let upgradeCost = 10;
+
+const stone = document.getElementById('stone');
+const crackSvg = document.getElementById('crack-svg');
+
+function updateUI() {
+    document.getElementById('hp').innerText = Math.max(0, Math.ceil(hp));
+    document.getElementById('power').innerText = power;
+    document.getElementById('score').innerText = score;
+    const btn = document.getElementById('upgradeBtn');
+    btn.innerText = `UPGRADE (Cost: ${upgradeCost})`;
+    btn.disabled = score < upgradeCost;
+}
+
+// ヒビを描画する関数
+function addCrack() {
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    const x1 = Math.random() * 100;
+    const y1 = Math.random() * 100;
+    const x2 = x1 + (Math.random() - 0.5) * 40;
+    const y2 = y1 + (Math.random() - 0.5) * 40;
+
+    line.setAttribute("x1", x1 + "%");
+    line.setAttribute("y1", y1 + "%");
+    line.setAttribute("x2", x2 + "%");
+    line.setAttribute("y2", y2 + "%");
+    line.setAttribute("stroke", "rgba(0,0,0,0.8)");
+    line.setAttribute("stroke-width", "1");
+    crackSvg.appendChild(line);
+}
+
+// 砕けた際の破片エフェクト
+function shatterEffect() {
+    const viewport = document.getElementById('game-viewport');
+    const rect = stone.getBoundingClientRect();
+    
+    for (let i = 0; i < 40; i++) {
+        const debris = document.createElement('div');
+        debris.className = 'debris';
+        
+        // ランダムな破片の形
+        const size = Math.random() * 15 + 5;
+        debris.style.width = size + 'px';
+        debris.style.height = size + 'px';
+        debris.style.left = (rect.left + rect.width/2) + 'px';
+        debris.style.top = (rect.top + rect.height/2) + 'px';
+        debris.style.clipPath = `polygon(${Math.random()*100}% 0%, 100% ${Math.random()*100}%, ${Math.random()*100}% 100%, 0% ${Math.random()*100}%)`;
+        
+        viewport.appendChild(debris);
+
+        // 物理挙動のシミュレーション
+        const angle = Math.random() * Math.PI * 2;
+        const velocity = Math.random() * 15 + 5;
+        let vx = Math.cos(angle) * velocity;
+        let vy = Math.sin(angle) * velocity;
+        let x = rect.left + rect.width/2;
+        let y = rect.top + rect.height/2;
+        let opacity = 1;
+
+        const animateDebris = () => {
+            x += vx;
+            y += vy;
+            vy += 0.5; // 重力
+            opacity -= 0.02;
+            debris.style.left = x + 'px';
+            debris.style.top = y + 'px';
+            debris.style.opacity = opacity;
+
+            if (opacity > 0) {
+                requestAnimationFrame(animateDebris);
+            } else {
+                debris.remove();
+            }
+        };
+        requestAnimationFrame(animateDebris);
+    }
+}
+
+stone.onclick = (e) => {
+    hp -= power;
+    
+    // クリックした場所に衝撃の揺れ
+    stone.style.transform = `scale(0.95) translate(${(Math.random()-0.5)*10}px, ${(Math.random()-0.5)*10}px)`;
+    setTimeout(() => stone.style.transform = 'scale(1)', 50);
+
+    // ダメージに応じてヒビを追加
+    if (Math.random() > 0.3) addCrack();
+
+    if (hp <= 0) {
+        shatterEffect(); // 砕ける演出
+        score += Math.floor(maxHp / 2);
+        maxHp = Math.floor(maxHp * 1.5);
+        hp = maxHp;
+        crackSvg.innerHTML = ''; // ヒビリセット
+        
+        // 一瞬石を消して復活させる
+        stone.style.display = 'none';
+        setTimeout(() => {
+            stone.style.display = 'block';
+            updateUI();
+        }, 300);
+    }
+    updateUI();
+};
+
+function upgrade() {
+    if (score >= upgradeCost) {
+        score -= upgradeCost;
+        power++;
+        upgradeCost = Math.floor(upgradeCost * 1.8);
+        updateUI();
+    }
+}
+
+updateUI();
+</script>
+</body>
+</html>
