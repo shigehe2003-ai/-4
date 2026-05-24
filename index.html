@@ -2,227 +2,266 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>リアル石割りシミュレーター</title>
-<style>
-  body {
-    text-align: center;
-    font-family: 'Segoe UI', sans-serif;
-    background: #121212;
-    color: #eee;
-    margin: 0;
-    overflow: hidden; /* 破片が外に出ないように */
-    user-select: none;
-  }
-
-  h1 { margin-top: 20px; color: #777; letter-spacing: 2px; }
-
-  /* 石の描画エリア */
-  #game-viewport {
-    position: relative;
-    width: 100vw;
-    height: 400px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-
-  /* 石本体 */
-  #stone {
-    width: 240px;
-    height: 220px;
-    background: radial-gradient(circle at 40% 40%, #999, #333);
-    clip-path: polygon(30% 0%, 80% 10%, 100% 40%, 85% 85%, 40% 100%, 5% 80%, 0% 30%);
-    position: relative;
-    cursor: pointer;
-    box-shadow: 0 30px 50px rgba(0,0,0,0.7);
-    transition: transform 0.05s ease-out;
-    z-index: 2;
-  }
-
-  /* リアルなヒビ（SVGで動的生成） */
-  #crack-svg {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    pointer-events: none;
-    z-index: 3;
-  }
-
-  /* 破片のスタイル */
-  .debris {
-    position: absolute;
-    background: #555;
-    pointer-events: none;
-    z-index: 1;
-  }
-
-  /* ステータス周り */
-  .ui-panel {
-    background: rgba(40, 40, 40, 0.9);
-    padding: 20px;
-    border-top: 2px solid #444;
-    position: fixed;
-    bottom: 0; width: 100%;
-    display: flex; justify-content: center; gap: 30px;
-  }
-
-  .stat-group { text-align: left; }
-  .label { font-size: 12px; color: #888; text-transform: uppercase; }
-  .number { font-size: 20px; font-weight: bold; color: #ffd700; display: block; }
-
-  button {
-    background: linear-gradient(to bottom, #555, #222);
-    border: 1px solid #666;
-    color: white;
-    padding: 10px 25px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-  }
-  button:hover { brightness: 1.2; }
-  button:disabled { opacity: 0.3; }
-
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>SBM量子分岐ゲーム</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            height: 100vh;
+        }
+        header {
+            text-align: center;
+            padding: 20px 10px 5px 10px;
+        }
+        h1 {
+            font-size: 1.2rem;
+            margin: 0 0 5px 0;
+            color: #58a6ff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        p {
+            font-size: 0.8rem;
+            margin: 0;
+            color: #8b949e;
+        }
+        #canvas-container {
+            width: 90vw;
+            height: 55vh;
+            position: relative;
+            border: 2px solid #30363d;
+            border-radius: 12px;
+            background: radial-gradient(circle, #161b22 0%, #0d1117 100%);
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        #controls {
+            width: 100%;
+            padding-bottom: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        .btn {
+            background: linear-gradient(135deg, #1f6feb 0%, #094cb5 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(31, 111, 235, 0.4);
+            transition: transform 0.1s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn:active {
+            transform: scale(0.95);
+            background: #1f6feb;
+        }
+        #status {
+            font-size: 1.1rem;
+            font-weight: bold;
+            height: 24px;
+            color: #58a6ff;
+        }
+    </style>
 </head>
 <body>
 
-<h1>⛏ REAL ROCK BREAKER</h1>
+    <header>
+        <h1>SBM Bifurcation Simulator</h1>
+        <p>タイミングよくタップして、粒子を上下に「分岐（最適化）」させろ！</p>
+    </header>
 
-<div id="game-viewport">
-  <div id="stone">
-    <svg id="crack-svg"></svg>
-  </div>
-</div>
+    <div id="canvas-container">
+        <canvas id="sbmCanvas"></canvas>
+    </div>
 
-<div class="ui-panel">
-  <div class="stat-group"><span class="label">Target HP</span><span id="hp" class="number">-</span></div>
-  <div class="stat-group"><span class="label">Power</span><span id="power" class="number">-</span></div>
-  <div class="stat-group"><span class="label">Score</span><span id="score" class="number">-</span></div>
-  <button id="upgradeBtn" onclick="upgrade()">UPGRADE (Cost: 10)</button>
-</div>
+    <div id="controls">
+        <div id="status">ステージ 1: 分岐を起こせ！</div>
+        <button class="btn" id="actionBtn" onclick="injectEnergy()">エネルギー注入 (PUMP)</button>
+    </div>
 
-<script>
-let maxHp = 30;
-let hp = maxHp;
-let power = 1;
-let score = 0;
-let upgradeCost = 10;
+    <script>
+        const canvas = document.getElementById('sbmCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusText = document.getElementById('status');
+        const actionBtn = document.getElementById('actionBtn');
 
-const stone = document.getElementById('stone');
-const crackSvg = document.getElementById('crack-svg');
+        // 解像度バグ防止（Retinaディスプレイ対応）
+        function resize() {
+            const rect = canvas.parentNode.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
 
-function updateUI() {
-    document.getElementById('hp').innerText = Math.max(0, Math.ceil(hp));
-    document.getElementById('power').innerText = power;
-    document.getElementById('score').innerText = score;
-    const btn = document.getElementById('upgradeBtn');
-    btn.innerText = `UPGRADE (Cost: ${upgradeCost})`;
-    btn.disabled = score < upgradeCost;
-}
+        let particles = [];
+        let numParticles = 40;
+        let bifurcationParam = 0; // 分岐パラメータ (0 = 未分岐, 1 = 完全分岐)
+        let isPumping = false;
+        let gameState = 'ready'; // ready, pumping, cleared, failed
+        let stage = 1;
 
-// ヒビを描画する関数
-function addCrack() {
-    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    const x1 = Math.random() * 100;
-    const y1 = Math.random() * 100;
-    const x2 = x1 + (Math.random() - 0.5) * 40;
-    const y2 = y1 + (Math.random() - 0.5) * 40;
-
-    line.setAttribute("x1", x1 + "%");
-    line.setAttribute("y1", y1 + "%");
-    line.setAttribute("x2", x2 + "%");
-    line.setAttribute("y2", y2 + "%");
-    line.setAttribute("stroke", "rgba(0,0,0,0.8)");
-    line.setAttribute("stroke-width", "1");
-    crackSvg.appendChild(line);
-}
-
-// 砕けた際の破片エフェクト
-function shatterEffect() {
-    const viewport = document.getElementById('game-viewport');
-    const rect = stone.getBoundingClientRect();
-    
-    for (let i = 0; i < 40; i++) {
-        const debris = document.createElement('div');
-        debris.className = 'debris';
-        
-        // ランダムな破片の形
-        const size = Math.random() * 15 + 5;
-        debris.style.width = size + 'px';
-        debris.style.height = size + 'px';
-        debris.style.left = (rect.left + rect.width/2) + 'px';
-        debris.style.top = (rect.top + rect.height/2) + 'px';
-        debris.style.clipPath = `polygon(${Math.random()*100}% 0%, 100% ${Math.random()*100}%, ${Math.random()*100}% 100%, 0% ${Math.random()*100}%)`;
-        
-        viewport.appendChild(debris);
-
-        // 物理挙動のシミュレーション
-        const angle = Math.random() * Math.PI * 2;
-        const velocity = Math.random() * 15 + 5;
-        let vx = Math.cos(angle) * velocity;
-        let vy = Math.sin(angle) * velocity;
-        let x = rect.left + rect.width/2;
-        let y = rect.top + rect.height/2;
-        let opacity = 1;
-
-        const animateDebris = () => {
-            x += vx;
-            y += vy;
-            vy += 0.5; // 重力
-            opacity -= 0.02;
-            debris.style.left = x + 'px';
-            debris.style.top = y + 'px';
-            debris.style.opacity = opacity;
-
-            if (opacity > 0) {
-                requestAnimationFrame(animateDebris);
-            } else {
-                debris.remove();
+        class Particle {
+            constructor(id) {
+                this.id = id;
+                this.reset();
             }
+
+            reset() {
+                // 初期状態：中央（0付近）でウロウロしている（量子揺らぎを表現）
+                this.x = 40 + Math.random() * 40; // 画面左側
+                this.y = 0; // 中央からのズレ
+                this.targetY = Math.random() > 0.5 ? 1 : -1; // 上下どちらに分岐するか
+                this.speedX = 1 + Math.random() * 1.5;
+                this.wobble = Math.random() * 5;
+            }
+
+            update(width, height) {
+                // X軸方向の進展
+                this.x += this.speedX;
+
+                // SBMの分岐数式を簡易再現：
+                // パラメータ(bifurcationParam)が大きくなると、一気に上下(targetY)へ引き離される力が発生する
+                if (isPumping) {
+                    let force = bifurcationParam * 4;
+                    this.y += (this.targetY * force - this.y) * 0.08;
+                } else {
+                    // 通常時はカオスにウロウロするだけ
+                    this.y += Math.sin(this.x * 0.05 + this.wobble) * 0.5;
+                }
+            }
+
+            draw(width, height) {
+                const centerY = height / 2;
+                // 実際の描画位置を計算
+                const drawX = (this.x / 100) * width;
+                const drawY = centerY + (this.y * (height * 0.35));
+
+                ctx.beginPath();
+                // 分岐状態に応じて色を変える（青から、上下に分かれるにつれて赤・緑へ）
+                if (this.y > 0.2) {
+                    ctx.fillStyle = `rgba(255, 126, 126, 0.8)`; // 下ルート（赤）
+                } else if (this.y < -0.2) {
+                    ctx.fillStyle = `rgba(88, 166, 255, 0.8)`; // 上ルート（青）
+                } else {
+                    ctx.fillStyle = 'rgba(240, 246, 252, 0.6)'; // 未確定（白）
+                }
+                
+                ctx.arc(drawX, drawY, 6, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function initGame() {
+            particles = [];
+            numParticles = 30 + stage * 10; // ステージが上がると粒子（変数）が増えて難しくなる
+            for (let i = 0; i < numParticles; i++) {
+                particles.push(new Particle(i));
+            }
+            bifurcationParam = 0;
+            isPumping = false;
+            gameState = 'ready';
+            actionBtn.innerText = "エネルギー注入 (PUMP)";
+            statusText.innerText = `ステージ ${stage}: 最適化せよ`;
+            statusText.style.color = "#58a6ff";
+        }
+
+        function injectEnergy() {
+            if (gameState === 'ready') {
+                isPumping = true;
+                gameState = 'pumping';
+                actionBtn.innerText = "制御中...";
+            } else if (gameState === 'cleared') {
+                stage++;
+                initGame();
+            } else if (gameState === 'failed') {
+                stage = 1;
+                initGame();
+            }
+        }
+
+        function animate() {
+            const width = canvas.width / window.devicePixelRatio;
+            const height = canvas.height / window.devicePixelRatio;
+
+            ctx.clearRect(0, 0, width, height);
+
+            // 背景にガイドライン（分岐のポテンシャル障壁）を描画
+            ctx.strokeStyle = 'rgba(48, 54, 61, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(0, height / 2);
+            ctx.lineTo(width, height / 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 分岐パラメータのシミュレーション
+            if (isPumping && bifurcationParam < 1) {
+                bifurcationParam += 0.015; // 徐々に相転移を起こす
+            }
+
+            let allFinished = true;
+            let successCount = 0;
+
+            particles.forEach(p => {
+                p.update(width, height);
+                p.draw(width, height);
+
+                // 画面の右端付近に到達したか
+                if (p.x < 90) {
+                    allFinished = false;
+                } else {
+                    // 完全に上下に分岐できていれば成功
+                    if (Math.abs(p.y) > 0.5) {
+                        successCount++;
+                    }
+                }
+            });
+
+            // ゲーム終了判定
+            if (gameState === 'pumping' && allFinished) {
+                isPumping = false;
+                const accuracy = (successCount / numParticles) * 100;
+                
+                if (accuracy >= 85) { // 85%以上の粒子が綺麗に分かれれば最適解獲得（クリア）
+                    gameState = 'cleared';
+                    statusText.innerText = `最適解 獲得！ (精度: ${Math.round(accuracy)}%)`;
+                    statusText.style.color = "#3ff27f";
+                    actionBtn.innerText = "次のステージへ";
+                } else {
+                    gameState = 'failed';
+                    statusText.innerText = `局所解にトラップされた... (精度: ${Math.round(accuracy)}%)`;
+                    statusText.style.color = "#ff7e7e";
+                    actionBtn.innerText = "リトライ";
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', resize);
+        window.onload = () => {
+            resize();
+            initGame();
+            requestAnimationFrame(animate);
         };
-        requestAnimationFrame(animateDebris);
-    }
-}
-
-stone.onclick = (e) => {
-    hp -= power;
-    
-    // クリックした場所に衝撃の揺れ
-    stone.style.transform = `scale(0.95) translate(${(Math.random()-0.5)*10}px, ${(Math.random()-0.5)*10}px)`;
-    setTimeout(() => stone.style.transform = 'scale(1)', 50);
-
-    // ダメージに応じてヒビを追加
-    if (Math.random() > 0.3) addCrack();
-
-    if (hp <= 0) {
-        shatterEffect(); // 砕ける演出
-        score += Math.floor(maxHp / 2);
-        maxHp = Math.floor(maxHp * 1.5);
-        hp = maxHp;
-        crackSvg.innerHTML = ''; // ヒビリセット
-        
-        // 一瞬石を消して復活させる
-        stone.style.display = 'none';
-        setTimeout(() => {
-            stone.style.display = 'block';
-            updateUI();
-        }, 300);
-    }
-    updateUI();
-};
-
-function upgrade() {
-    if (score >= upgradeCost) {
-        score -= upgradeCost;
-        power++;
-        upgradeCost = Math.floor(upgradeCost * 1.8);
-        updateUI();
-    }
-}
-
-updateUI();
-</script>
+    </script>
 </body>
-^_^
+</html>
